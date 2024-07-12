@@ -14,6 +14,9 @@ Most fake-data libraries optimize for *realistic-looking* data. This one optimiz
 - **Boundary-value & negative cases** — `tdg.boundary.*` produces the values QA actually needs: at, just inside, and just outside every edge, each labeled and flagged `valid: true/false` so they drop straight into `test.each`.
 - **Schema-based records & relational datasets** — describe a record once, generate one or a thousand; generate whole databases with guaranteed-valid foreign keys.
 - **Constraint-aware** — `string.fromRegex()` generates values matching the formats your system validates; `uniqueFactory()` guarantees no duplicates against unique constraints.
+- **Security & negative testing** — ready-made XSS / SQLi / command-injection / path-traversal payloads, all flagged `valid: false` for `test.each`.
+- **Localized** — `en`, `de`, `es`, `hi_IN` (plus custom packs) for names and addresses.
+- **Batteries included** — templates, JSON/CSV/SQL export, and a `tdg` CLI.
 - **Zero runtime dependencies**, dual ESM + CJS, full TypeScript types.
 
 ## Install
@@ -88,7 +91,72 @@ test.each(cases)('quantity $label ($value)', ({ value, valid }) => {
 });
 ```
 
-Also available: `boundary.strings({ minLength, maxLength })` (length edges, whitespace-only, unicode) and `boundary.emails()` (valid + classic invalid formats).
+Also available:
+- `boundary.strings({ minLength, maxLength })` — length edges, whitespace-only, unicode
+- `boundary.floats({ min, max })` — epsilon-nudged edges plus `NaN` / `±Infinity` / `-0`
+- `boundary.dates({ min, max })` — edge dates plus unparseable / impossible / `Invalid Date`
+- `boundary.emails()` — valid + classic invalid formats
+
+## Security payloads (negative testing)
+
+Labeled malicious-input cases for testing **your own** input validation and sanitization — every case is flagged `valid: false`:
+
+```ts
+test.each(g.security.all())('rejects $label', ({ value }) => {
+  expect(() => saveComment(value)).not.toThrow();     // no crash
+  expect(renderedOutput(value)).not.toContain('<script>'); // neutralized
+});
+```
+
+Categories: `security.xss()`, `security.sqlInjection()`, `security.commandInjection()`, `security.pathTraversal()`, and `security.all()` (the union).
+
+## Templates
+
+Compose values with a mustache-style string — `{{module.method}}`, with optional JSON args:
+
+```ts
+g.helpers.fake('{{person.fullName}} <{{internet.email}}>');
+// 'Maya Fischer <maya.fischer@proton.me>'
+g.helpers.fake('Order #{{number.int({"min":1000,"max":9999})}}');
+```
+
+## Localization
+
+Names and addresses adapt to the active locale; anything a locale omits falls back to English:
+
+```ts
+new TestDataGenerator({ locale: 'de' }).person.fullName();    // 'Lukas Schwarz'
+new TestDataGenerator({ locale: 'hi_IN' }).location.city();   // 'Hyderabad'
+new TestDataGenerator({ locale: 'es' }).person.firstName();   // 'Lucía'
+```
+
+Built-in: `en`, `de`, `es`, `hi_IN`. Supply your own `LocaleData` pack or a fallback chain (`locale: [myPack, 'de']`) — first pack to provide a field wins.
+
+## Exporting
+
+Turn generated rows into files/fixtures:
+
+```ts
+import { toJSON, toCSV, toSQL } from '@lambdatest/test-data-generator';
+
+const users = g.fromSchema(userSchema, 100);
+toJSON(users);                       // pretty JSON (dates → ISO)
+toCSV(users);                        // RFC-4180 CSV
+toSQL('users', users);               // INSERT statements (safely escaped)
+toSQL('users', users, { multiRow: true, quote: '`' }); // one multi-row MySQL INSERT
+```
+
+## CLI
+
+Generate fixtures without writing code:
+
+```bash
+npx tdg users --count 100 --seed 42            # 100 reproducible users as JSON
+npx tdg users -c 50 -l de -f csv               # German users as CSV
+npx tdg transactions -c 20 -f sql -t payments  # SQL INSERTs into "payments"
+```
+
+Built-in schemas: `users`, `products`, `transactions`. Options: `--count/-c`, `--seed/-s`, `--locale/-l`, `--format/-f` (json·csv·sql), `--table/-t`, `--ref-date`. A seed makes output fully reproducible — dates included.
 
 ## Uniqueness guarantees
 
@@ -172,8 +240,9 @@ const g = new TestDataGenerator({
 | `finance` | `amount()`, `currency*()`, Luhn-valid `creditCardNumber()`, `pin()`, `accountNumber()` |
 | `phone` | `number('###-###-####')`, `international()` |
 | `lorem` | `word()`, `sentence()`, `paragraph()`, `slug()` |
-| `helpers` | `arrayElement()`, `weighted()`, `shuffle()`, `multiple()`, `maybe()`, `unique()`, `uniqueFactory()`, `replaceSymbols()`, `slugify()` |
-| `boundary` | `integers()`, `strings()`, `emails()` — labeled valid/invalid test cases |
+| `helpers` | `arrayElement()`, `weighted()`, `shuffle()`, `multiple()`, `maybe()`, `unique()`, `uniqueFactory()`, `fake()`, `replaceSymbols()`, `slugify()` |
+| `boundary` | `integers()`, `strings()`, `floats()`, `dates()`, `emails()` — labeled valid/invalid cases |
+| `security` | `xss()`, `sqlInjection()`, `commandInjection()`, `pathTraversal()`, `all()` — malicious-input cases |
 
 All module methods are pre-bound — destructure freely: `const { email } = g.internet`.
 
@@ -197,12 +266,15 @@ const g = new TestDataGenerator({ randomizer: myRandomizer, seed: 42 });
 - [x] Uniqueness guarantees (`unique()` / `uniqueFactory()`)
 - [x] Regex-constrained generation (`string.fromRegex()`)
 - [x] Relational datasets with valid foreign keys (`dataset()`)
-- [ ] Boundary cases for dates and floats
-- [ ] Security payloads (XSS/SQLi negative cases)
-- [ ] Locale packs (names/addresses beyond English)
-- [ ] `fake('{{person.fullName}}')`-style templates
-- [ ] CSV / JSON / SQL export helpers
-- [ ] CLI (`npx tdg users --count 100 --seed 42`)
+- [x] Boundary cases for dates and floats (`boundary.floats()` / `boundary.dates()`)
+- [x] Security payloads (`security.xss()` / `sqlInjection()` / …)
+- [x] Locale packs (`en`, `de`, `es`, `hi_IN` + custom)
+- [x] `fake('{{person.fullName}}')`-style templates
+- [x] CSV / JSON / SQL export helpers (`toCSV` / `toJSON` / `toSQL`)
+- [x] CLI (`npx tdg users --count 100 --seed 42`)
+- [ ] More locales and richer per-locale data
+- [ ] JSON-Schema / Zod-aware generation
+- [ ] REST API service wrapper
 
 ## Contributing
 

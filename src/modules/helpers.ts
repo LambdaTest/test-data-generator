@@ -193,6 +193,60 @@ export class HelpersModule extends Module {
     return result;
   }
 
+  /**
+   * Resolves a mustache-style template by calling generator methods.
+   * Each `{{module.method}}` is replaced by the string result of
+   * `g.module.method()`. Arguments are supported via JSON:
+   * `{{number.int({"min":1,"max":9})}}`. Nested/repeated tokens resolve too.
+   *
+   * @example
+   * g.helpers.fake('{{person.fullName}} <{{internet.email}}>');
+   * // 'Maya Fischer <maya.fischer@proton.me>'
+   */
+  fake(template: string): string {
+    const tokenPattern = /\{\{\s*([a-zA-Z]+)\.([a-zA-Z]+)\s*(\([\s\S]*?\))?\s*\}\}/;
+    let result = template;
+    let guard = 0;
+
+    while (tokenPattern.test(result)) {
+      if (guard++ > 1000) {
+        throw new TDGError('fake: template exceeded 1000 substitutions (possible recursive expansion).');
+      }
+
+      result = result.replace(
+        tokenPattern,
+        (_match, moduleName: string, methodName: string, rawArgs?: string) => {
+          const mod = (this.g as unknown as Record<string, unknown>)[moduleName];
+          if (mod == null || typeof mod !== 'object') {
+            throw new TDGError(`fake: unknown module '${moduleName}' in template.`);
+          }
+
+          const method = (mod as Record<string, unknown>)[methodName];
+          if (typeof method !== 'function') {
+            throw new TDGError(`fake: '${moduleName}.${methodName}' is not a generator method.`);
+          }
+
+          const args = this.parseFakeArgs(rawArgs, `${moduleName}.${methodName}`);
+          return String((method as (...a: unknown[]) => unknown)(...args));
+        }
+      );
+    }
+
+    return result;
+  }
+
+  private parseFakeArgs(rawArgs: string | undefined, where: string): unknown[] {
+    if (!rawArgs) return [];
+    const inner = rawArgs.slice(1, -1).trim();
+    if (inner === '') return [];
+    try {
+      // Wrap in array brackets so multiple comma-separated JSON args parse.
+      return JSON.parse(`[${inner}]`) as unknown[];
+    } catch {
+      throw new TDGError(`fake: could not parse arguments for '${where}'. Use JSON, e.g. {{number.int({"min":1,"max":9})}}.`);
+    }
+  }
+
   /** Lowercases and replaces non-alphanumeric runs with `-`. */
   slugify(text: string): string {
     return text

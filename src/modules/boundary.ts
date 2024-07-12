@@ -28,6 +28,24 @@ export interface StringBoundaryOptions {
   includeInvalid?: boolean;
 }
 
+export interface FloatBoundaryOptions {
+  min: number;
+  max: number;
+  /** Smallest meaningful step past an edge. Default `Number.EPSILON`. */
+  epsilon?: number;
+  /** Include out-of-range and special (NaN/Infinity) cases. Default `true`. */
+  includeInvalid?: boolean;
+}
+
+export interface DateBoundaryOptions {
+  min: Date | string | number;
+  max: Date | string | number;
+  /** Step past an edge, in milliseconds. Default `1`. */
+  stepMs?: number;
+  /** Include out-of-range and malformed-date cases. Default `true`. */
+  includeInvalid?: boolean;
+}
+
 /**
  * Boundary-value and negative test data — the cases QA actually needs:
  * values at, just inside, and just outside the edges of a constraint.
@@ -130,5 +148,75 @@ export class BoundaryModule extends Module {
       { value: 'user@@example.com', label: 'double @', valid: false },
       { value: 'user@example..com', label: 'consecutive dots in domain', valid: false },
     ];
+  }
+
+  /** Boundary cases for an inclusive floating-point range. */
+  floats(options: FloatBoundaryOptions): BoundaryCase<number>[] {
+    const { min, max, epsilon = Number.EPSILON, includeInvalid = true } = options;
+
+    if (min > max) {
+      throw new TDGError(`min (${min}) cannot be greater than max (${max}).`);
+    }
+
+    const nudge = (v: number, dir: 1 | -1): number => {
+      const step = Math.max(Math.abs(v) * epsilon, epsilon);
+      return v + dir * step;
+    };
+
+    const cases: BoundaryCase<number>[] = [
+      { value: min, label: 'at minimum', valid: true },
+      { value: nudge(min, 1), label: 'just above minimum', valid: true },
+      { value: (min + max) / 2, label: 'midpoint', valid: true },
+      { value: nudge(max, -1), label: 'just below maximum', valid: true },
+      { value: max, label: 'at maximum', valid: true },
+    ];
+
+    if (includeInvalid) {
+      cases.unshift({ value: nudge(min, -1), label: 'just below minimum', valid: false });
+      cases.push(
+        { value: nudge(max, 1), label: 'just above maximum', valid: false },
+        { value: Number.NaN, label: 'NaN', valid: false },
+        { value: Number.POSITIVE_INFINITY, label: 'positive infinity', valid: false },
+        { value: Number.NEGATIVE_INFINITY, label: 'negative infinity', valid: false },
+        { value: -0, label: 'negative zero', valid: min <= 0 && max >= 0 }
+      );
+    }
+
+    return cases;
+  }
+
+  /** Boundary cases for an inclusive date range. */
+  dates(options: DateBoundaryOptions): BoundaryCase<Date | string>[] {
+    const { stepMs = 1, includeInvalid = true } = options;
+    const min = new Date(options.min).getTime();
+    const max = new Date(options.max).getTime();
+
+    if (Number.isNaN(min) || Number.isNaN(max)) {
+      throw new TDGError('dates() received an invalid min/max.');
+    }
+
+    if (min > max) {
+      throw new TDGError('min must be before or equal to max.');
+    }
+
+    const cases: BoundaryCase<Date | string>[] = [
+      { value: new Date(min), label: 'at minimum', valid: true },
+      { value: new Date(min + stepMs), label: 'just after minimum', valid: true },
+      { value: new Date((min + max) / 2), label: 'midpoint', valid: true },
+      { value: new Date(max - stepMs), label: 'just before maximum', valid: true },
+      { value: new Date(max), label: 'at maximum', valid: true },
+    ];
+
+    if (includeInvalid) {
+      cases.unshift({ value: new Date(min - stepMs), label: 'just before minimum', valid: false });
+      cases.push(
+        { value: new Date(max + stepMs), label: 'just after maximum', valid: false },
+        { value: 'not-a-date', label: 'unparseable string', valid: false },
+        { value: '2026-02-30', label: 'impossible calendar date', valid: false },
+        { value: new Date(Number.NaN), label: 'Invalid Date object', valid: false }
+      );
+    }
+
+    return cases;
   }
 }

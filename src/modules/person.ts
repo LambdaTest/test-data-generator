@@ -1,14 +1,17 @@
-import { firstNames, jobTitles, lastNames } from '../data/en.js';
 import { Module } from './base.js';
 
-/** People: names and job titles. */
+/** People: names and job titles. Names come from the active locale. */
 export class PersonModule extends Module {
   firstName(): string {
-    return this.g.helpers.arrayElement(firstNames);
+    return this.g.helpers.arrayElement(
+      this.g.localeEntry<string>('person', 'firstNames')
+    );
   }
 
   lastName(): string {
-    return this.g.helpers.arrayElement(lastNames);
+    return this.g.helpers.arrayElement(
+      this.g.localeEntry<string>('person', 'lastNames')
+    );
   }
 
   /** Full name, e.g. `"Priya Nakamura"`. */
@@ -17,6 +20,8 @@ export class PersonModule extends Module {
   }
 
   jobTitle(): string {
-    return this.g.helpers.arrayElement(jobTitles);
+    return this.g.helpers.arrayElement(
+      this.g.localeEntry<string>('person', 'jobTitles')
+    );
   }
 }

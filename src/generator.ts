@@ -3,6 +3,15 @@ import {
   type DatasetCollection,
   type DatasetResult,
 } from './dataset.js';
+import { TDGError } from './errors.js';
+import {
+  localeEntry,
+  mergeLocales,
+  type LocaleCategory,
+  type LocaleData,
+  type LocaleInput,
+} from './locale.js';
+import { en, locales } from './locales/index.js';
 import { Mulberry32, randomSeed, type Randomizer } from './random.js';
 import {
   createSchemaContext,
@@ -21,6 +30,7 @@ import { LoremModule } from './modules/lorem.js';
 import { NumberModule } from './modules/number.js';
 import { PersonModule } from './modules/person.js';
 import { PhoneModule } from './modules/phone.js';
+import { SecurityModule } from './modules/security.js';
 import { StringModule } from './modules/string.js';
 
 export interface TDGOptions {
@@ -34,6 +44,12 @@ export interface TDGOptions {
    * Defaults to "now" at call time.
    */
   refDate?: Date | string | number | (() => Date);
+  /**
+   * Locale for names/addresses. A built-in name (`'en'`, `'de'`, `'es'`,
+   * `'hi_IN'`), a custom `LocaleData` pack, or a fallback chain. The `en`
+   * pack is always appended as the final fallback. Defaults to `'en'`.
+   */
+  locale?: LocaleInput | LocaleInput[];
 }
 
 /**
@@ -58,7 +74,11 @@ export class TestDataGenerator {
   readonly number: NumberModule = new NumberModule(this);
   readonly person: PersonModule = new PersonModule(this);
   readonly phone: PhoneModule = new PhoneModule(this);
+  readonly security: SecurityModule = new SecurityModule(this);
   readonly string: StringModule = new StringModule(this);
+
+  /** The resolved locale data (chosen locale merged over the `en` fallback). */
+  readonly locale: LocaleData;
 
   private refDateSource: () => Date;
 
@@ -68,7 +88,33 @@ export class TestDataGenerator {
       this.randomizer.seed(options.seed);
     }
 
+    this.locale = TestDataGenerator.resolveLocale(options.locale);
     this.refDateSource = TestDataGenerator.toRefDateSource(options.refDate);
+  }
+
+  private static resolveLocale(
+    locale: TDGOptions['locale']
+  ): LocaleData {
+    const inputs = locale === undefined ? [] : Array.isArray(locale) ? locale : [locale];
+    const packs = inputs.map((input) => {
+      if (typeof input !== 'string') return input;
+      const pack = locales[input];
+      if (!pack) {
+        throw new TDGError(
+          `Unknown locale '${input}'. Built-in locales: ${Object.keys(locales).join(', ')}.`
+        );
+      }
+
+      return pack;
+    });
+
+    // Always append `en` as the final fallback.
+    return mergeLocales([...packs, en]);
+  }
+
+  /** Reads a locale array (e.g. `person.firstNames`), used by locale-aware modules. */
+  localeEntry<T>(category: LocaleCategory, key: string): T[] {
+    return localeEntry<T>(this.locale, category, key);
   }
 
   private static toRefDateSource(

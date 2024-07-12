@@ -1,7 +1,7 @@
 {
   "name": "@lambdatest/test-data-generator",
-  "version": "0.1.0",
-  "description": "Deterministic, seedable test data generator for QA and development. Boundary-value cases, schema-based record generation, zero dependencies.",
+  "version": "0.2.0",
+  "description": "Deterministic, seedable test data generator for QA and development. Boundary-value cases, security payloads, regex-constrained strings, relational datasets, locales, templates, and export helpers. Zero dependencies.",
   "keywords": [
     "test-data",
     "fake-data",
@@ -33,6 +33,9 @@
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "tdg": "./dist/cli.cjs"
+  },
   "files": [
     "dist",
     "README.md",

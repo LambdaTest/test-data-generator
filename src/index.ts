@@ -1,4 +1,21 @@
 export { TestDataGenerator, tdg, type TDGOptions } from './generator.js';
+export {
+  localeEntry,
+  mergeLocales,
+  type LocaleCategory,
+  type LocaleData,
+  type LocaleInput,
+} from './locale.js';
+export { de, en, es, hi_IN, locales, localeNames } from './locales/index.js';
+export {
+  toCSV,
+  toJSON,
+  toSQL,
+  type CsvOptions,
+  type Row,
+  type SqlOptions,
+} from './export.js';
+export { runCli } from './cli.js';
 export { Mulberry32, hashStringSeed, randomSeed, type Randomizer } from './random.js';
 export { TDGError } from './errors.js';
 export {
@@ -21,9 +38,12 @@ export { Module } from './modules/base.js';
 export {
   BoundaryModule,
   type BoundaryCase,
+  type DateBoundaryOptions,
+  type FloatBoundaryOptions,
   type IntBoundaryOptions,
   type StringBoundaryOptions,
 } from './modules/boundary.js';
+export { SecurityModule } from './modules/security.js';
 export { DateModule } from './modules/date.js';
 export { FinanceModule, type CardIssuer } from './modules/finance.js';
 export {
