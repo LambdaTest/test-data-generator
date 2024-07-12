@@ -1,6 +1,6 @@
 # @lambdatest/test-data-generator
 
-> Deterministic, seedable test data for QA and development — with boundary-value cases and schema-based record generation built in. Zero dependencies.
+> Deterministic, seedable test data for QA and development — boundary-value cases, regex-constrained strings, uniqueness guarantees, and relational datasets with valid foreign keys. Zero dependencies.
 
 [![CI](https://github.com/lambdatest/test-data-generator/actions/workflows/ci.yml/badge.svg)](https://github.com/lambdatest/test-data-generator/actions/workflows/ci.yml)
 [![npm version](https://img.shields.io/npm/v/@lambdatest/test-data-generator)](https://www.npmjs.com/package/@lambdatest/test-data-generator)
@@ -12,7 +12,8 @@ Most fake-data libraries optimize for *realistic-looking* data. This one optimiz
 
 - **Deterministic by design** — seed with a number *or a string* (`seed: 'checkout-flow'`), pin the reference date, and every run of your suite generates the exact same data. Failures replay perfectly.
 - **Boundary-value & negative cases** — `tdg.boundary.*` produces the values QA actually needs: at, just inside, and just outside every edge, each labeled and flagged `valid: true/false` so they drop straight into `test.each`.
-- **Schema-based records** — describe a record once, generate one or a thousand.
+- **Schema-based records & relational datasets** — describe a record once, generate one or a thousand; generate whole databases with guaranteed-valid foreign keys.
+- **Constraint-aware** — `string.fromRegex()` generates values matching the formats your system validates; `uniqueFactory()` guarantees no duplicates against unique constraints.
 - **Zero runtime dependencies**, dual ESM + CJS, full TypeScript types.
 
 ## Install
