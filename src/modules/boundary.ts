@@ -86,7 +86,10 @@ export class BoundaryModule extends Module {
       cases.push({ value: max + 1, label: 'above maximum', valid: false });
     }
 
-    return cases;
+    // On tiny ranges some edges coincide (e.g. [1,2] → "just above minimum"
+    // and "at maximum" are both 2). Dedupe by value, keeping the later
+    // (more canonical edge) label so no value is tested twice.
+    return dedupeByValue(cases);
   }
 
   /** Boundary cases for a string-length constraint. */
@@ -130,7 +133,9 @@ export class BoundaryModule extends Module {
       valid: true,
     });
 
-    return cases;
+    // Degenerate constraints (e.g. maxLength: 0) can make several cases the
+    // same string; dedupe so no value is emitted twice.
+    return dedupeByValue(cases);
   }
 
   /** Valid and invalid email samples for negative testing. */
@@ -163,16 +168,25 @@ export class BoundaryModule extends Module {
       return v + dir * step;
     };
 
-    const cases: BoundaryCase<number>[] = [
-      { value: min, label: 'at minimum', valid: true },
-      { value: nudge(min, 1), label: 'just above minimum', valid: true },
-      { value: (min + max) / 2, label: 'midpoint', valid: true },
-      { value: nudge(max, -1), label: 'just below maximum', valid: true },
-      { value: max, label: 'at maximum', valid: true },
-    ];
+    const cases: BoundaryCase<number>[] = [];
+    if (includeInvalid) {
+      cases.push({ value: nudge(min, -1), label: 'just below minimum', valid: false });
+    }
+
+    cases.push({ value: min, label: 'at minimum', valid: true });
+
+    // Interior cases only exist when the range is non-degenerate; on min==max
+    // a nudge would land OUTSIDE [min,max] yet be labeled valid.
+    if (min < max) {
+      const above = nudge(min, 1);
+      if (above < max) cases.push({ value: above, label: 'just above minimum', valid: true });
+      cases.push({ value: (min + max) / 2, label: 'midpoint', valid: true });
+      const below = nudge(max, -1);
+      if (below > min) cases.push({ value: below, label: 'just below maximum', valid: true });
+      cases.push({ value: max, label: 'at maximum', valid: true });
+    }
 
     if (includeInvalid) {
-      cases.unshift({ value: nudge(min, -1), label: 'just below minimum', valid: false });
       cases.push(
         { value: nudge(max, 1), label: 'just above maximum', valid: false },
         { value: Number.NaN, label: 'NaN', valid: false },
@@ -182,7 +196,7 @@ export class BoundaryModule extends Module {
       );
     }
 
-    return cases;
+    return dedupeByValue(cases);
   }
 
   /** Boundary cases for an inclusive date range. */
@@ -199,24 +213,54 @@ export class BoundaryModule extends Module {
       throw new TDGError('min must be before or equal to max.');
     }
 
-    const cases: BoundaryCase<Date | string>[] = [
-      { value: new Date(min), label: 'at minimum', valid: true },
-      { value: new Date(min + stepMs), label: 'just after minimum', valid: true },
-      { value: new Date((min + max) / 2), label: 'midpoint', valid: true },
-      { value: new Date(max - stepMs), label: 'just before maximum', valid: true },
-      { value: new Date(max), label: 'at maximum', valid: true },
-    ];
+    const cases: BoundaryCase<Date | string>[] = [];
+    if (includeInvalid) {
+      cases.push({ value: new Date(min - stepMs), label: 'just before minimum', valid: false });
+    }
+
+    cases.push({ value: new Date(min), label: 'at minimum', valid: true });
+
+    // Interior points only exist for a non-degenerate range; on min==max they
+    // would fall outside [min,max] yet be labeled valid.
+    if (min < max) {
+      const after = min + stepMs;
+      if (after < max) cases.push({ value: new Date(after), label: 'just after minimum', valid: true });
+      cases.push({ value: new Date((min + max) / 2), label: 'midpoint', valid: true });
+      const before = max - stepMs;
+      if (before > min) cases.push({ value: new Date(before), label: 'just before maximum', valid: true });
+      cases.push({ value: new Date(max), label: 'at maximum', valid: true });
+    }
 
     if (includeInvalid) {
-      cases.unshift({ value: new Date(min - stepMs), label: 'just before minimum', valid: false });
       cases.push(
         { value: new Date(max + stepMs), label: 'just after maximum', valid: false },
         { value: 'not-a-date', label: 'unparseable string', valid: false },
-        { value: '2026-02-30', label: 'impossible calendar date', valid: false },
+        // Month 13 → NaN in JS. (Note: '2026-02-30' would silently roll over
+        // to March 2, so it is NOT a reliably-invalid string.)
+        { value: '2026-13-01', label: 'impossible calendar date', valid: false },
         { value: new Date(Number.NaN), label: 'Invalid Date object', valid: false }
       );
     }
 
-    return cases;
+    return dedupeByValue(cases, (v) =>
+      v instanceof Date ? `t${v.getTime()}` : `s${v}`
+    );
   }
+}
+
+/**
+ * Removes cases whose value collides (later label wins — the more canonical
+ * edge). `-0` is kept distinct from `0` so the negative-zero case survives.
+ */
+function dedupeByValue<T>(
+  cases: BoundaryCase<T>[],
+  keyOf: (value: T) => unknown = (value) => value
+): BoundaryCase<T>[] {
+  const map = new Map<unknown, BoundaryCase<T>>();
+  for (const c of cases) {
+    const key = keyOf(c.value);
+    map.set(Object.is(key, -0) ? '-0' : key, c);
+  }
+
+  return [...map.values()];
 }

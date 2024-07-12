@@ -31,7 +31,9 @@ export class FinanceModule extends Module {
   /** Amount as a fixed-decimal string, e.g. `"128.53"`. */
   amount(options: { min?: number; max?: number; fractionDigits?: number } = {}): string {
     const { min = 0, max = 1000, fractionDigits = 2 } = options;
-    return this.g.number.float({ min, max }).toFixed(fractionDigits);
+    // Delegate rounding to number.float so the value is validated and clamped
+    // to [min, max] (never exceeds max), then format with fixed decimals.
+    return this.g.number.float({ min, max, fractionDigits }).toFixed(fractionDigits);
   }
 
   currency(): { code: string; name: string; symbol: string } {

@@ -34,6 +34,10 @@ export class StringModule extends Module {
 
     const resolvedLength =
       typeof length === 'number' ? length : this.g.number.int(length);
+    if (!Number.isInteger(resolvedLength) || resolvedLength < 0) {
+      throw new TDGError(`length (${resolvedLength}) must be a non-negative integer.`);
+    }
+
     let result = '';
     for (let i = 0; i < resolvedLength; i++) {
       const index = this.g.number.int({ max: characters.length - 1 });

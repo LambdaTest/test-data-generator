@@ -96,14 +96,15 @@ export class HelpersModule extends Module {
 
   /** Random subset (without replacement) of the given size. */
   arrayElements<const T>(array: readonly T[], count?: Count): T[] {
-    const size = Math.min(
+    const requested =
       count === undefined
         ? this.g.number.int({ max: array.length })
         : typeof count === 'number'
           ? count
-          : this.g.number.int(count),
-      array.length
-    );
+          : this.g.number.int(count);
+    // Clamp into [0, array.length] so a negative count can't slice from the
+    // end (slice(0, -n)) and an oversized count can't exceed the array.
+    const size = Math.max(0, Math.min(requested, array.length));
     return this.shuffle(array).slice(0, size);
   }
 
@@ -197,42 +198,35 @@ export class HelpersModule extends Module {
    * Resolves a mustache-style template by calling generator methods.
    * Each `{{module.method}}` is replaced by the string result of
    * `g.module.method()`. Arguments are supported via JSON:
-   * `{{number.int({"min":1,"max":9})}}`. Nested/repeated tokens resolve too.
+   * `{{number.int({"min":1,"max":9})}}`.
+   *
+   * Resolution is a single left-to-right pass over the ORIGINAL template, so
+   * there is no token limit and a generator whose output happens to contain
+   * `{{...}}` is never re-interpreted as a template.
    *
    * @example
    * g.helpers.fake('{{person.fullName}} <{{internet.email}}>');
    * // 'Maya Fischer <maya.fischer@proton.me>'
    */
   fake(template: string): string {
-    const tokenPattern = /\{\{\s*([a-zA-Z]+)\.([a-zA-Z]+)\s*(\([\s\S]*?\))?\s*\}\}/;
-    let result = template;
-    let guard = 0;
-
-    while (tokenPattern.test(result)) {
-      if (guard++ > 1000) {
-        throw new TDGError('fake: template exceeded 1000 substitutions (possible recursive expansion).');
-      }
-
-      result = result.replace(
-        tokenPattern,
-        (_match, moduleName: string, methodName: string, rawArgs?: string) => {
-          const mod = (this.g as unknown as Record<string, unknown>)[moduleName];
-          if (mod == null || typeof mod !== 'object') {
-            throw new TDGError(`fake: unknown module '${moduleName}' in template.`);
-          }
-
-          const method = (mod as Record<string, unknown>)[methodName];
-          if (typeof method !== 'function') {
-            throw new TDGError(`fake: '${moduleName}.${methodName}' is not a generator method.`);
-          }
-
-          const args = this.parseFakeArgs(rawArgs, `${moduleName}.${methodName}`);
-          return String((method as (...a: unknown[]) => unknown)(...args));
+    const tokenPattern = /\{\{\s*([a-zA-Z]+)\.([a-zA-Z]+)\s*(\([\s\S]*?\))?\s*\}\}/g;
+    return template.replace(
+      tokenPattern,
+      (_match, moduleName: string, methodName: string, rawArgs?: string) => {
+        const mod = (this.g as unknown as Record<string, unknown>)[moduleName];
+        if (mod == null || typeof mod !== 'object') {
+          throw new TDGError(`fake: unknown module '${moduleName}' in template.`);
         }
-      );
-    }
 
-    return result;
+        const method = (mod as Record<string, unknown>)[methodName];
+        if (typeof method !== 'function') {
+          throw new TDGError(`fake: '${moduleName}.${methodName}' is not a generator method.`);
+        }
+
+        const args = this.parseFakeArgs(rawArgs, `${moduleName}.${methodName}`);
+        return String((method as (...a: unknown[]) => unknown)(...args));
+      }
+    );
   }
 
   private parseFakeArgs(rawArgs: string | undefined, where: string): unknown[] {

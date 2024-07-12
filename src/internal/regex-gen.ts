@@ -115,6 +115,12 @@ class RegexParser {
       return atom;
     }
 
+    if (min > max) {
+      throw new TDGError(
+        `fromRegex: quantifier {${min},${max}} has min greater than max in /${this.src}/.`
+      );
+    }
+
     // Consume a lazy/possessive modifier — irrelevant for generation.
     if (this.peek() === '?' || this.peek() === '+') this.next();
     return { type: 'repeat', node: atom, min, max };
@@ -201,7 +207,7 @@ class RegexParser {
     }
   }
 
-  private parseEscape(c: string): Node {
+  private parseEscape(c: string, inClass = false): Node {
     switch (c) {
       case 'd':
         return { type: 'chars', chars: DIGITS };
@@ -221,16 +227,63 @@ class RegexParser {
         return { type: 'literal', value: '\t' };
       case 'r':
         return { type: 'literal', value: '\r' };
+      case 'f':
+        return { type: 'literal', value: '\f' };
+      case 'v':
+        return { type: 'literal', value: '\v' };
+      case '0':
+        return { type: 'literal', value: '\0' };
+      case 'x':
+        return { type: 'literal', value: String.fromCharCode(this.readHex(2)) };
+      case 'u':
+        return { type: 'literal', value: this.readUnicodeEscape() };
       case 'b':
-      case 'B':
+        // Inside a character class `\b` is the backspace char, not a boundary.
+        if (inClass) return { type: 'literal', value: '\b' };
         throw new TDGError('fromRegex: word boundaries (\\b) are not supported.');
+      case 'B':
+        if (inClass) return { type: 'literal', value: 'B' };
+        throw new TDGError('fromRegex: word boundaries (\\B) are not supported.');
       default:
-        if (/\d/.test(c)) {
+        if (/\d/.test(c) && !inClass) {
           throw new TDGError('fromRegex: backreferences are not supported.');
         }
 
         return { type: 'literal', value: c };
     }
+  }
+
+  /** Reads exactly `n` hex digits and returns their numeric value. */
+  private readHex(n: number): number {
+    let hex = '';
+    for (let i = 0; i < n; i++) {
+      const d = this.next();
+      if (!/[0-9a-fA-F]/.test(d)) {
+        throw new TDGError(`fromRegex: invalid hex escape digit '${d}'.`);
+      }
+
+      hex += d;
+    }
+
+    return parseInt(hex, 16);
+  }
+
+  /** Reads a `\u` escape: either `\uHHHH` or `\u{H...}`. */
+  private readUnicodeEscape(): string {
+    if (this.peek() === '{') {
+      this.next(); // '{'
+      let hex = '';
+      while (!this.eof() && this.peek() !== '}') hex += this.next();
+      if (this.eof()) throw new TDGError('fromRegex: unterminated \\u{...} escape.');
+      this.next(); // '}'
+      if (!/^[0-9a-fA-F]+$/.test(hex)) {
+        throw new TDGError(`fromRegex: invalid \\u{${hex}} escape.`);
+      }
+
+      return String.fromCodePoint(parseInt(hex, 16));
+    }
+
+    return String.fromCharCode(this.readHex(4));
   }
 
   private parseCharClass(): Node {
@@ -245,7 +298,7 @@ class RegexParser {
       let start: string;
       const c = this.next();
       if (c === '\\') {
-        const escaped = this.parseEscape(this.next());
+        const escaped = this.parseEscape(this.next(), true);
         if (escaped.type === 'chars') {
           chars += escaped.chars;
           continue;
@@ -261,7 +314,7 @@ class RegexParser {
         this.next(); // '-'
         let end = this.next();
         if (end === '\\') {
-          const escaped = this.parseEscape(this.next());
+          const escaped = this.parseEscape(this.next(), true);
           if (escaped.type === 'chars') {
             throw new TDGError('fromRegex: invalid character-class range.');
           }

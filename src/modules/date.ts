@@ -30,28 +30,29 @@ export class DateModule extends Module {
   past(options: { years?: number; refDate?: Date | string | number } = {}): Date {
     const { years = 1 } = options;
     const ref = new Date(options.refDate ?? this.g.refDate).getTime();
-    return this.between({ from: ref - years * MS_PER_YEAR, to: ref - 1 });
+    // `to: ref` (not ref-1) so years:0 yields the ref date instead of throwing.
+    return this.between({ from: ref - Math.abs(years) * MS_PER_YEAR, to: ref });
   }
 
   /** Random date in the future, up to `years` (default 1) after the ref date. */
   future(options: { years?: number; refDate?: Date | string | number } = {}): Date {
     const { years = 1 } = options;
     const ref = new Date(options.refDate ?? this.g.refDate).getTime();
-    return this.between({ from: ref + 1, to: ref + years * MS_PER_YEAR });
+    return this.between({ from: ref, to: ref + Math.abs(years) * MS_PER_YEAR });
   }
 
   /** Random date within the last `days` (default 1). */
   recent(options: { days?: number; refDate?: Date | string | number } = {}): Date {
     const { days = 1 } = options;
     const ref = new Date(options.refDate ?? this.g.refDate).getTime();
-    return this.between({ from: ref - days * MS_PER_DAY, to: ref - 1 });
+    return this.between({ from: ref - Math.abs(days) * MS_PER_DAY, to: ref });
   }
 
   /** Random date within the next `days` (default 1). */
   soon(options: { days?: number; refDate?: Date | string | number } = {}): Date {
     const { days = 1 } = options;
     const ref = new Date(options.refDate ?? this.g.refDate).getTime();
-    return this.between({ from: ref + 1, to: ref + days * MS_PER_DAY });
+    return this.between({ from: ref, to: ref + Math.abs(days) * MS_PER_DAY });
   }
 
   /** Birthdate for an age between minAge and maxAge (defaults 18–65). */

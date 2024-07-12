@@ -60,8 +60,11 @@ export class NumberModule extends Module {
       throw new TDGError(`min (${min}) cannot be greater than max (${max}).`);
     }
 
-    if (fractionDigits !== undefined && (!Number.isInteger(fractionDigits) || fractionDigits < 0)) {
-      throw new TDGError(`fractionDigits (${fractionDigits}) must be a non-negative integer.`);
+    if (
+      fractionDigits !== undefined &&
+      (!Number.isInteger(fractionDigits) || fractionDigits < 0 || fractionDigits > 100)
+    ) {
+      throw new TDGError(`fractionDigits (${fractionDigits}) must be an integer between 0 and 100.`);
     }
 
     const value = this.g.randomizer.next() * (max - min) + min;
@@ -69,8 +72,11 @@ export class NumberModule extends Module {
       return value;
     }
 
+    // Rounding can push the value to `max` or below `min`; clamp back so the
+    // result always stays within [min, max] (max becomes reachable here).
     const factor = 10 ** fractionDigits;
-    return Math.round(value * factor) / factor;
+    const rounded = Math.round(value * factor) / factor;
+    return Math.min(Math.max(rounded, min), max);
   }
 
   /** Random hex number string of the given length, e.g. `"a3f9"`. */

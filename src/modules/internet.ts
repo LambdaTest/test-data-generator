@@ -26,8 +26,25 @@ export class InternetModule extends Module {
       { probability: 0.4 }
     );
 
-    const local = `${this.g.helpers.slugify(first)}${separator}${this.g.helpers.slugify(last)}${suffix ?? ''}`;
+    const local = this.sanitizeLocalPart(
+      `${this.g.helpers.slugify(first)}${separator}${this.g.helpers.slugify(last)}${suffix ?? ''}`
+    );
     return `${local}@${provider}`;
+  }
+
+  /**
+   * Ensures an email local part is RFC-valid: collapses repeated dots, strips
+   * leading/trailing separators, and falls back to a generated handle when the
+   * inputs slugify to nothing (e.g. empty or non-Latin names).
+   */
+  private sanitizeLocalPart(raw: string): string {
+    const cleaned = raw
+      .replace(/\.{2,}/g, '.')
+      .replace(/^[._-]+/, '')
+      .replace(/[._-]+$/, '');
+    return cleaned === ''
+      ? `user${this.g.number.int({ min: 1, max: 9999 })}`
+      : cleaned;
   }
 
   /** Username, e.g. `"priya_nakamura42"`. */
@@ -39,7 +56,7 @@ export class InternetModule extends Module {
       () => String(this.g.number.int({ min: 1, max: 999 })),
       { probability: 0.6 }
     );
-    return `${first}${separator}${last}${suffix ?? ''}`;
+    return this.sanitizeLocalPart(`${first}${separator}${last}${suffix ?? ''}`);
   }
 
   /** Domain name, e.g. `"quiet-otter.dev"`. */
