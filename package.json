@@ -1,0 +1,57 @@
+{
+  "name": "@lambdatest/test-data-generator",
+  "version": "0.1.0",
+  "description": "Deterministic, seedable test data generator for QA and development. Boundary-value cases, schema-based record generation, zero dependencies.",
+  "keywords": [
+    "test-data",
+    "fake-data",
+    "testing",
+    "qa",
+    "mock",
+    "seed",
+    "deterministic",
+    "boundary-value",
+    "generator"
+  ],
+  "homepage": "https://github.com/lambdatest/test-data-generator#readme",
+  "bugs": "https://github.com/lambdatest/test-data-generator/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lambdatest/test-data-generator.git"
+  },
+  "license": "MIT",
+  "author": "LambdaTest",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "ts-check": "tsc --noEmit",
+    "prepublishOnly": "npm run ts-check && npm run test && npm run build"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "vitest": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "sideEffects": false
+}
