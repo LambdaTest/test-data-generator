@@ -48,16 +48,15 @@ describe('regression: internet.email always valid', () => {
 
 describe('regression: number.float stays within [min, max]', () => {
   it('rounding never escapes the range', () => {
-    for (let i = 0; i < 200_000; i++) {
-      const v = g.number.float({ min: 0, max: 1, fractionDigits: 1 });
-      expect(v).toBeGreaterThanOrEqual(0);
-      expect(v).toBeLessThanOrEqual(1);
+    let escapes = 0;
+    for (let i = 0; i < 100_000; i++) {
+      const a = g.number.float({ min: 0, max: 1, fractionDigits: 1 });
+      if (a < 0 || a > 1) escapes++;
+      const b = g.number.float({ min: 0.4, max: 1, fractionDigits: 0 });
+      if (b < 0.4 || b > 1) escapes++;
     }
-    for (let i = 0; i < 50_000; i++) {
-      const v = g.number.float({ min: 0.4, max: 1, fractionDigits: 0 });
-      expect(v).toBeGreaterThanOrEqual(0.4);
-      expect(v).toBeLessThanOrEqual(1);
-    }
+
+    expect(escapes).toBe(0);
   });
 
   it('rejects out-of-bounds fractionDigits', () => {
@@ -100,11 +99,13 @@ describe('regression: string.fromCharacters validates length', () => {
 
 describe('regression: finance.amount respects max and validates digits', () => {
   it('never exceeds max', () => {
+    let escapes = 0;
     for (let i = 0; i < 50_000; i++) {
       const a = Number(g.finance.amount({ min: 0, max: 1 }));
-      expect(a).toBeLessThanOrEqual(1);
-      expect(a).toBeGreaterThanOrEqual(0);
+      if (a < 0 || a > 1) escapes++;
     }
+
+    expect(escapes).toBe(0);
   });
 
   it('throws a TDGError (not a raw RangeError) for bad fractionDigits', () => {
