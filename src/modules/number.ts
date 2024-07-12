@@ -35,7 +35,21 @@ export class NumberModule extends Module {
       throw new TDGError(`min (${min}) cannot be greater than max (${max}).`);
     }
 
-    return Math.floor(this.g.randomizer.next() * (max - min + 1)) + min;
+    const span = max - min;
+    // A single 32-bit draw resolves spans up to 2^32 exactly. For wider
+    // ranges it would leave gaps (e.g. odd values unreachable), so combine
+    // two draws into a 53-bit fraction. Narrow ranges keep the single-draw
+    // path, so their output is unchanged.
+    const fraction =
+      span <= 0xffffffff ? this.g.randomizer.next() : this.highResFraction();
+    return Math.floor(fraction * (span + 1)) + min;
+  }
+
+  /** A ~53-bit fraction in [0, 1) built from two randomizer draws. */
+  private highResFraction(): number {
+    const hi = Math.floor(this.g.randomizer.next() * 0x8000000); // 27 bits
+    const lo = Math.floor(this.g.randomizer.next() * 0x4000000); // 26 bits
+    return (hi * 0x4000000 + lo) / 0x20000000000000; // / 2^53
   }
 
   /** Random float in [min, max). */

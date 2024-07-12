@@ -49,6 +49,7 @@
     "prepublishOnly": "npm run ts-check && npm run test && npm run build"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^3.2.7",
     "tsup": "^8.3.5",
     "typescript": "^5.7.2",
     "vitest": "^3.0.0"

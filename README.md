@@ -246,6 +246,11 @@ const g = new TestDataGenerator({
 
 All module methods are pre-bound — destructure freely: `const { email } = g.internet`.
 
+> **Not for cryptographic use.** The default PRNG (mulberry32) is fast and
+> deterministic, ideal for reproducible tests — but it is **not** cryptographically
+> secure. Values like `id.uuid()` and `internet.password()` are seed-deterministic
+> and predictable; never use them as real secrets, tokens, or security material.
+
 ## Custom randomness
 
 The PRNG is pluggable via the two-method `Randomizer` interface:
