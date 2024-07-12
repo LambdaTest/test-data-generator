@@ -2,12 +2,20 @@ export { TestDataGenerator, tdg, type TDGOptions } from './generator.js';
 export { Mulberry32, hashStringSeed, randomSeed, type Randomizer } from './random.js';
 export { TDGError } from './errors.js';
 export {
+  createSchemaContext,
   resolveSchema,
   type FieldFn,
   type Infer,
   type Schema,
   type SchemaContext,
+  type SchemaLiteral,
 } from './schema.js';
+export {
+  resolveDataset,
+  type DatasetCollection,
+  type DatasetResult,
+} from './dataset.js';
+export { type FromRegexOptions } from './internal/regex-gen.js';
 
 export { Module } from './modules/base.js';
 export {
@@ -21,6 +29,7 @@ export { FinanceModule, type CardIssuer } from './modules/finance.js';
 export {
   HelpersModule,
   type Count,
+  type UniqueFn,
   type WeightedEntry,
 } from './modules/helpers.js';
 export { IdModule } from './modules/id.js';

@@ -89,6 +89,63 @@ test.each(cases)('quantity $label ($value)', ({ value, valid }) => {
 
 Also available: `boundary.strings({ minLength, maxLength })` (length edges, whitespace-only, unicode) and `boundary.emails()` (valid + classic invalid formats).
 
+## Uniqueness guarantees
+
+Inserting generated data into anything with a unique constraint? Wrap the generator:
+
+```ts
+const email = g.helpers.uniqueFactory(() => g.internet.email());
+const users = g.fromSchema({ email: () => email() }, 1000); // 1000 distinct emails
+```
+
+Throws a clear `TDGError` if the value space is exhausted (configurable `maxRetries`, plus `clear()` to reset). A scoped one-off variant also exists: `g.helpers.unique(fn, { scope: 'emails' })`.
+
+## Regex-constrained strings
+
+Generate values that match the formats your system actually validates:
+
+```ts
+g.string.fromRegex(/^[A-Z]{2}-\d{4}$/);              // 'QT-8317'
+g.string.fromRegex(/^(GST|PAN)-[A-Z0-9]{10}$/);      // 'PAN-4XKP2M9QF1'
+g.string.fromRegex(/^v\d+\.\d+\.\d+(-rc\.\d)?$/);    // 'v2.14.0-rc.3'
+```
+
+Supports literals, `.`, escapes (`\d \w \s` + negations), character classes, groups, alternation, and all quantifiers (unbounded ones capped via `{ maxRepetition }`). Every generated value is self-checked against the real regex engine. Lookarounds, backreferences and `\b` throw a clear error.
+
+## Relational datasets
+
+Seed whole databases with guaranteed-valid foreign keys and internally consistent records:
+
+```ts
+const db = g.dataset({
+  users: {
+    count: 10,
+    schema: {
+      id: (g) => g.id.uuid(),
+      firstName: (g) => g.person.firstName(),
+      // later fields can reference earlier ones — consistent records
+      email: (g, ctx) => g.internet.email({ firstName: ctx.record.firstName }),
+    },
+  },
+  orders: {
+    each: { of: 'users', count: { min: 1, max: 3 } }, // 1–3 orders PER user
+    schema: {
+      id: (g) => g.id.nanoid(10),
+      userId: (_g, ctx) => ctx.parent.id, // guaranteed-valid FK
+      amount: (g) => g.finance.amount({ min: 10, max: 500 }),
+    },
+  },
+  auditLogs: {
+    count: 50,
+    schema: {
+      // or associate randomly with any previously generated collection
+      actorId: (g, ctx) => g.helpers.arrayElement(ctx.entities.users).id,
+    },
+  },
+});
+// db.users: 10, db.orders: 10–30 (every userId exists), db.auditLogs: 50
+```
+
 ## Reproducible dates
 
 Seeding fixes the random stream; relative dates also need a fixed "now":
@@ -105,7 +162,7 @@ const g = new TestDataGenerator({
 | Module | Highlights |
 | --- | --- |
 | `number` | `int({min,max})`, `float({fractionDigits})`, `hex()` |
-| `string` | `alpha()`, `alphanumeric()`, `numeric()`, `fromCharacters()`, length ranges |
+| `string` | `alpha()`, `alphanumeric()`, `numeric()`, `fromCharacters()`, `fromRegex()`, length ranges |
 | `id` | `uuid()` (v4, seed-deterministic), `nanoid()`, `hex()` |
 | `person` | `firstName()`, `lastName()`, `fullName()`, `jobTitle()` |
 | `internet` | `email()`, `username()`, `url()`, `ip()`, `ipv6()`, `mac()`, `password()`, `httpStatusCode()` |
@@ -114,7 +171,7 @@ const g = new TestDataGenerator({
 | `finance` | `amount()`, `currency*()`, Luhn-valid `creditCardNumber()`, `pin()`, `accountNumber()` |
 | `phone` | `number('###-###-####')`, `international()` |
 | `lorem` | `word()`, `sentence()`, `paragraph()`, `slug()` |
-| `helpers` | `arrayElement()`, `weighted()`, `shuffle()`, `multiple()`, `maybe()`, `replaceSymbols()`, `slugify()` |
+| `helpers` | `arrayElement()`, `weighted()`, `shuffle()`, `multiple()`, `maybe()`, `unique()`, `uniqueFactory()`, `replaceSymbols()`, `slugify()` |
 | `boundary` | `integers()`, `strings()`, `emails()` — labeled valid/invalid test cases |
 
 All module methods are pre-bound — destructure freely: `const { email } = g.internet`.
@@ -136,9 +193,13 @@ const g = new TestDataGenerator({ randomizer: myRandomizer, seed: 42 });
 
 ## Roadmap
 
+- [x] Uniqueness guarantees (`unique()` / `uniqueFactory()`)
+- [x] Regex-constrained generation (`string.fromRegex()`)
+- [x] Relational datasets with valid foreign keys (`dataset()`)
+- [ ] Boundary cases for dates and floats
+- [ ] Security payloads (XSS/SQLi negative cases)
 - [ ] Locale packs (names/addresses beyond English)
 - [ ] `fake('{{person.fullName}}')`-style templates
-- [ ] Boundary cases for dates and floats
 - [ ] CSV / JSON / SQL export helpers
 - [ ] CLI (`npx tdg users --count 100 --seed 42`)
 

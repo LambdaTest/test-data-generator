@@ -1,4 +1,8 @@
 import { TDGError } from '../errors.js';
+import {
+  generateFromRegex,
+  type FromRegexOptions,
+} from '../internal/regex-gen.js';
 import { Module } from './base.js';
 
 export type Casing = 'upper' | 'lower' | 'mixed';
@@ -63,6 +67,20 @@ export class StringModule extends Module {
   /** Random digit string. Note: may start with `0`, so treat it as a string. */
   numeric(length: Length = 1): string {
     return this.fromCharacters(DIGITS, length);
+  }
+
+  /**
+   * A random string matching the given regular expression. Supports the
+   * common subset: literals, `.`, escapes (`\d \w \s` and negations),
+   * character classes, groups, alternation, and quantifiers. Unbounded
+   * quantifiers are capped via `maxRepetition` (default 5). Lookarounds,
+   * backreferences and `\b` throw.
+   *
+   * @example
+   * g.string.fromRegex(/^[A-Z]{2}-\d{4}$/) // 'QT-8317'
+   */
+  fromRegex(pattern: RegExp | string, options: FromRegexOptions = {}): string {
+    return generateFromRegex(this.g, pattern, options);
   }
 
   /** Random printable-ASCII sample string. */

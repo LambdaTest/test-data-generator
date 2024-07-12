@@ -8,8 +8,83 @@ export interface WeightedEntry<T> {
 
 export type Count = number | { min: number; max: number };
 
+/** A generator wrapped by `uniqueFactory()` — never returns the same value twice. */
+export interface UniqueFn<T> {
+  (): T;
+  /** Forgets all previously returned values. */
+  clear: () => void;
+  /** Number of distinct values returned so far. */
+  seenCount: () => number;
+}
+
 /** Generic utilities that make composing generators convenient. */
 export class HelpersModule extends Module {
+  private readonly uniqueStores = new Map<string, Set<unknown>>();
+
+  /**
+   * Returns a value from `fn` that has not been returned before (per scope).
+   * Uniqueness is by primitive value (`Set` semantics). Throws a TDGError
+   * once `maxRetries` consecutive draws produce only already-seen values.
+   *
+   * @example
+   * g.helpers.unique(() => g.internet.email(), { scope: 'emails' })
+   */
+  unique<T>(
+    fn: () => T,
+    options: { scope?: string; maxRetries?: number } = {}
+  ): T {
+    const { scope = 'default', maxRetries = 50 } = options;
+    let store = this.uniqueStores.get(scope);
+    if (!store) {
+      store = new Set();
+      this.uniqueStores.set(scope, store);
+    }
+
+    return this.drawUnique(fn, store, maxRetries);
+  }
+
+  /** Clears one unique scope, or all scopes when called without arguments. */
+  clearUnique(scope?: string): void {
+    if (scope === undefined) {
+      this.uniqueStores.clear();
+    } else {
+      this.uniqueStores.delete(scope);
+    }
+  }
+
+  /**
+   * Wraps `fn` with its own private seen-set. Prefer this over `unique()`
+   * when generating batches — no scope-name collisions possible.
+   *
+   * @example
+   * const email = g.helpers.uniqueFactory(() => g.internet.email());
+   * g.fromSchema({ email: () => email() }, 1000); // 1000 distinct emails
+   */
+  uniqueFactory<T>(
+    fn: () => T,
+    options: { maxRetries?: number } = {}
+  ): UniqueFn<T> {
+    const { maxRetries = 50 } = options;
+    const seen = new Set<unknown>();
+    const wrapped = (() => this.drawUnique(fn, seen, maxRetries)) as UniqueFn<T>;
+    wrapped.clear = () => seen.clear();
+    wrapped.seenCount = () => seen.size;
+    return wrapped;
+  }
+
+  private drawUnique<T>(fn: () => T, seen: Set<unknown>, maxRetries: number): T {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      const candidate = fn();
+      if (!seen.has(candidate)) {
+        seen.add(candidate);
+        return candidate;
+      }
+    }
+
+    throw new TDGError(
+      `unique: no new unique value after ${maxRetries} attempts (${seen.size} values already used). Widen the value space, raise maxRetries, or clear the store.`
+    );
+  }
   /** Random element from a non-empty array. */
   arrayElement<const T>(array: readonly T[]): T {
     if (array.length === 0) {

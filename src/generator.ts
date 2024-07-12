@@ -1,5 +1,15 @@
+import {
+  resolveDataset,
+  type DatasetCollection,
+  type DatasetResult,
+} from './dataset.js';
 import { Mulberry32, randomSeed, type Randomizer } from './random.js';
-import { resolveSchema, type Infer, type Schema } from './schema.js';
+import {
+  createSchemaContext,
+  resolveSchema,
+  type Infer,
+  type Schema,
+} from './schema.js';
 import { BoundaryModule } from './modules/boundary.js';
 import { DateModule } from './modules/date.js';
 import { FinanceModule } from './modules/finance.js';
@@ -108,12 +118,32 @@ export class TestDataGenerator {
     count?: number
   ): Infer<S> | Array<Infer<S>> {
     if (count === undefined) {
-      return resolveSchema(this, schema, { index: 0 });
+      return resolveSchema(this, schema, createSchemaContext({ index: 0 }));
     }
 
     return Array.from({ length: count }, (_, index) =>
-      resolveSchema(this, schema, { index })
+      resolveSchema(this, schema, createSchemaContext({ index }))
     );
+  }
+
+  /**
+   * Generates a relational dataset: named collections resolved in declaration
+   * order. Later collections reference earlier ones via `ctx.entities.<name>`
+   * or generate children per parent via `each` — foreign keys stay valid.
+   *
+   * @example
+   * const db = g.dataset({
+   *   users: { count: 10, schema: { id: (g) => g.id.uuid() } },
+   *   orders: {
+   *     each: { of: 'users', count: { min: 1, max: 3 } },
+   *     schema: { userId: (_g, ctx) => ctx.parent.id },
+   *   },
+   * });
+   */
+  dataset<D extends Record<string, DatasetCollection>>(
+    definition: D
+  ): DatasetResult<D> {
+    return resolveDataset(this, definition) as DatasetResult<D>;
   }
 }
 
